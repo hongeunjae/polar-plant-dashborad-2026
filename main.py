@@ -120,7 +120,7 @@ if env_file is not None:
 elif growth_file is not None:
     school_name = os.path.splitext(os.path.basename(growth_file.name))[0]
 
-st.title("그린란드고추완이의 생육 수준에 따른 뿌리 특성 비교")
+st.title("그린란드고추넹이의 생육 수준에 따른 뿌리 특성 비교")
 st.caption(f"학교: {school_name if school_name else '업로드된 학교 정보를 확인 중...'}")
 
 with st.spinner("CSV를 읽고 열 이름을 표준화하는 중..."):
