@@ -211,7 +211,7 @@ with tab1:
                     fig.update_layout(title="개체별 생중량", xaxis_title="", yaxis_title="생중량(g)", height=500)
                     st.plotly_chart(fig, width="stretch")
 
-                    # 가장 무거운 개체와 가장 가벼운 개체의 생중량 비교
+                    # 가장 무거운 개체와 가장 가벼운 개체의 생중량 비교 막대그래프
                     fig2 = go.Figure(data=[go.Bar(x=["가장 무거운 개체", "가장 가벼운 개체"], y=[max_v, min_v], marker_color=["#f59e0b", "#ef4444"])])
                     fig2.update_layout(title="가장 무거운 개체와 가장 가벼운 개체의 생중량 비교", yaxis_title="생중량(g)", height=400)
                     st.plotly_chart(fig2, width="stretch")
