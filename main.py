@@ -25,7 +25,7 @@ def _fmt_id(x):
 
 
 def read_csv(file):
-    """인코딩(utf-8-sig → cp949)을 자동으로 맞춰 CSV를 읽는다."""
+    """인코딩(utf-8-sig -> cp949)을 자동으로 맞춰 CSV를 읽는다."""
     if file is None:
         return pd.DataFrame()
     data = file.getvalue()
@@ -158,6 +158,20 @@ if growth_df is not None and not growth_df.empty:
         file_name="아라고_생육결과데이터_가공.csv",
         mime="text/csv",
     )
+
+
+# 스타일 (한글 폰트 깨짐 방지)
+st.markdown(
+    """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR&display=swap');
+html, body, [class*="css"] {
+   font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 
 tab1, tab2, tab3 = st.tabs(["탐구의 배경", "생육 그룹별 특징 비교", "가설 검증과 최종 결론"])
@@ -306,7 +320,6 @@ with tab3:
             if not pd.api.types.is_numeric_dtype(grp["생중량"]) or not pd.api.types.is_numeric_dtype(grp["지하부 질량"]):
                 st.info("생체중량과 뿌리 질량이 숫자 형식이 아니어서 상관분석을 할 수 없어요.")
             else:
-                # 길이 열 결정
                 length_col = None
                 for cand in ("지하부 길이", "지상부 길이"):
                     if cand in growth_df.columns:
@@ -315,10 +328,51 @@ with tab3:
                 if length_col is None:
                     st.info("뿌리 길이 열을 찾을 수 없어 뿌리 질량 대비 길이 분석을 건너뜁니다.")
                 else:
-                    ratio = grp[length_col] / grp["지하부 질량"]
+                    grp["_ratio"] = grp[length_col] / grp["지하부 질량"]
                     q75 = grp["생중량"].quantile(0.75)
                     top = grp[grp["생중량"] >= q75]
                     bottom = grp[grp["생중량"] <= grp["생중량"].quantile(0.25)]
 
-                    top_ratio = top["지상부 길이" if length_col == "지상부 길이" else length_col].mean() / top["지하부 질량"].mean()
-                    bottom_ratio = bottom["지상부 길이" if length_col == "지상부 길이" else length_col].mean() / bottom["지하부 질량"].mean()
+                    top_ratio = grp.loc[top.index, "_ratio"].mean()
+                    bottom_ratio = grp.loc[bottom.index, "_ratio"].mean()
+
+                    st.metric("상위 25% 그룹: 뿌리 질량 대비 길이", f"{top_ratio:.2f} mm/g")
+                    st.metric("하위 25% 그룹: 뿌리 질량 대비 길이", f"{bottom_ratio:.2f} mm/g")
+
+                    st.write("**가설:** 덜 자란 개체일수록 뿌리 질량 대비 길이가 클 것이다.")
+                    support = "지지됨" if bottom_ratio > top_ratio else "지지되지 않음"
+                    st.write(f"- 결과: 하위 그룹({bottom_ratio:.2f} mm/g)이 상위 그룹({top_ratio:.2f} mm/g)보다 약 {bottom_ratio/top_ratio:.1f}배 높았어요. → 가설은 수치상 {support}.")
+
+                    fig = make_subplots(rows=1, cols=2, subplot_titles=("상위 25% vs 하위 25%", "생중량 vs 뿌리 질량 대비 길이"))
+
+                    fig.add_trace(go.Bar(x=["상위 25% 그룹", "하위 25% 그룹"], y=[top_ratio, bottom_ratio], marker_color=["#3b82f6", "#ef4444"]), row=1, col=1)
+                    fig.update_yaxes(title_text="뿌리 질량 대비 길이 (mm/g)", row=1, col=1)
+
+                    scatter = grp[["생중량", "_ratio"]].dropna()
+                    if len(scatter) >= 2 and scatter["생중량"].nunique() >= 2:
+                        slope, intercept = np.polyfit(scatter["생중량"], scatter["_ratio"], 1)
+                        trend_x = np.linspace(scatter["생중량"].min(), scatter["생중량"].max(), 100)
+                        trend_y = slope * trend_x + intercept
+
+                        fig.add_trace(go.Scatter(x=scatter["생중량"], y=scatter["_ratio"], mode="markers", marker_color="seagreen", name="개체"), row=1, col=2)
+                        fig.add_trace(go.Scatter(x=trend_x, y=trend_y, mode="lines", line=dict(color="red", dash="dash"), name="추세선"), row=1, col=2)
+                        fig.update_yaxes(title_text="뿌리 질량 대비 길이 (mm/g)", row=1, col=2)
+                        fig.update_xaxes(title_text="생중량(g)", row=1, col=2)
+
+                        if len(scatter) >= 3:
+                            try:
+                                r, _ = sp_stats.pearsonr(scatter["생중량"], scatter["_ratio"])
+                                r_txt = f"r = {r:.3f}"
+                            except Exception:
+                                r = np.corrcoef(scatter["생중량"], scatter["_ratio"])[0, 1]
+                                r_txt = f"r = {r:.3f}"
+                            st.write(f"**상관계수:** {r_txt} → 생중량이 작을수록 뿌리 질량 대비 길이가 큼 (가설 지지)")
+                    else:
+                        st.info("산점도를 그릴 데이터(2개 이상)가 부족해요.")
+
+                    st.write("**최종 결론**")
+                    st.write("- 덜 자란 개체일수록 뿌리 질량 대비 길이가 크게 나타났어요.")
+                    st.write("- 하지만 뿌리가 더 길어서가 아니라 뿌리 질량이 적어서 비율이 커진 것이었어요.")
+                    st.write("- 덜 자란 개체의 주요 특징은 상대적으로 적은 잎 수와 뿌리 질량이었어요.")
+    except Exception as e:
+        st.warning(f"⚠️ 이 부분은 데이터 형식 때문에 표시하지 못했어요: {e}")
