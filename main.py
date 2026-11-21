@@ -123,7 +123,7 @@ def get_school_name(env_file, growth_file):
         name = base.split("_")[0].strip()
         if name:
             return name
-    return "우리 학교"
+    return "아라고"
 
 
 def fmt_id(v):
