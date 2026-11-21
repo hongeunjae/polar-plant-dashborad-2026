@@ -268,7 +268,7 @@ with tab2:
         if growth_df is None or "생중량" not in growth_df.columns:
             st.info("생육 CSV를 업로드하면 상위 25% 그룹과 하위 25% 그룹의 특징을 비교할 수 있어요.")
         else:
-            grp = growth_df.dropna(subset=["생중량"]).copy()
+            grp = growth_df.dropna(subset=["생중량"]).copy().reset_index(drop=True)
             if not pd.api.types.is_numeric_dtype(grp["생중량"]):
                 st.info("생체중량이 숫자 형식이 아니어서 그룹 비교를 할 수 없어요.")
             else:
@@ -277,10 +277,10 @@ with tab2:
                 else:
                     q75 = grp["생중량"].quantile(0.75)
                     q25 = grp["생중량"].quantile(0.25)
-                    top = grp[grp["생중량"] >= q75]
-                    bottom = grp[grp["생중량"] <= q25]
+                    top = grp[grp["생중량"] >= q75].sort_values("생중량", ascending=False)
+                    bottom = grp[grp["생중량"] <= q25].sort_values("생중량", ascending=False)
 
-                    # 길이 열 결정 (지하부 길이가 있으면 사용)
+                    # 길이 열 결정 (지하부 길이가 있으면 사용, 없으면 지상부 길이)
                     length_col = None
                     for cand in ("지하부 길이", "지상부 길이"):
                         if cand in growth_df.columns:
@@ -302,89 +302,93 @@ with tab2:
                         summary_df = pd.DataFrame(summary_rows)
                         st.dataframe(summary_df, width="stretch")
 
-                    # 잎 수 비교 그래프 (막대=그룹 평균, 점=개별 개체, 라벨=평균)
+                    # 점 그래프 (막대 대신 개별 식물 포인트)
+                    # 잎 수
                     if "잎 수" in grp.columns:
                         fig = go.Figure()
-                        fig.add_trace(go.Bar(
-                            x=["상위 25% 그룹", "하위 25% 그룹"],
-                            y=[top["잎 수"].mean(), bottom["잎 수"].mean()],
-                            marker_color=["#3b82f6", "#ef4444"],
-                            text=[f"평균 {top['잎 수'].mean():,.1f}장", f"평균 {bottom['잎 수'].mean():,.1f}장"],
-                            textposition="outside",
-                            name="잎 수 평균",
+                        fig.add_trace(go.Scatter(
+                            x=top["개체번호"].apply(_fmt_id), y=top["잎 수"],
+                            mode="markers",
+                            marker=dict(color="#3b82f6", size=12, line=dict(color="white", width=1)),
+                            name="상위 25% 개체",
+                            text=top["개체번호"].apply(_fmt_id).tolist(),
+                            hovertemplate="%{text} 잎 수 %{y:.1f}장<extra></extra>",
                         ))
                         fig.add_trace(go.Scatter(
-                            x=["상위 25% 그룹"] * len(top) + ["하위 25% 그룹"] * len(bottom),
-                            y=list(top["잎 수"]) + list(bottom["잎 수"]),
+                            x=bottom["개체번호"].apply(_fmt_id), y=bottom["잎 수"],
                             mode="markers",
-                            marker=dict(color=["#3b82f6"] * len(top) + ["#ef4444"] * len(bottom), size=8),
-                            showlegend=False,
-                            name="개별 개체",
+                            marker=dict(color="#ef4444", size=12, line=dict(color="white", width=1)),
+                            name="하위 25% 개체",
+                            text=bottom["개체번호"].apply(_fmt_id).tolist(),
+                            hovertemplate="%{text} 잎 수 %{y:.1f}장<extra></extra>",
                         ))
                         fig.update_layout(
-                            title="잎 수 비교 (상위 25% vs 하위 25%)",
-                            xaxis_title="그룹",
+                            title="잎 수 비교 (개별 개체 점)",
+                            xaxis_title="개체번호",
                             yaxis_title="잎 수(장)",
-                            height=450,
+                            height=400,
                         )
                         st.plotly_chart(fig, width="stretch")
                         st.write(f"- 잎 수: 상위 {top['잎 수'].mean():,.1f}장 / 하위 {bottom['잎 수'].mean():,.1f}장")
 
-                    # 뿌리 길이 비교 그래프 (막대=그룹 평균, 점=개별 개체, 라벨=평균)
+                    # 뿌리 길이
                     if length_col is not None:
                         fig = go.Figure()
-                        fig.add_trace(go.Bar(
-                            x=["상위 25% 그룹", "하위 25% 그룹"],
-                            y=[top[length_col].mean(), bottom[length_col].mean()],
-                            marker_color=["#3b82f6", "#ef4444"],
-                            text=[f"평균 {top[length_col].mean():,.1f}mm", f"평균 {bottom[length_col].mean():,.1f}mm"],
-                            textposition="outside",
-                            name="뿌리 길이 평균",
+                        fig.add_trace(go.Scatter(
+                            x=top["개체번호"].apply(_fmt_id), y=top[length_col],
+                            mode="markers",
+                            marker=dict(color="#3b82f6", size=12, line=dict(color="white", width=1)),
+                            name="상위 25% 개체",
+                            text=top["개체번호"].apply(_fmt_id).tolist(),
+                            hovertemplate="%{text} 길이 %{y:.1f}mm<extra></extra>",
                         ))
                         fig.add_trace(go.Scatter(
-                            x=["상위 25% 그룹"] * len(top) + ["하위 25% 그룹"] * len(bottom),
-                            y=list(top[length_col]) + list(bottom[length_col]),
+                            x=bottom["개체번호"].apply(_fmt_id), y=bottom[length_col],
                             mode="markers",
-                            marker=dict(color=["#3b82f6"] * len(top) + ["#ef4444"] * len(bottom), size=8),
-                            showlegend=False,
-                            name="개별 개체",
+                            marker=dict(color="#ef4444", size=12, line=dict(color="white", width=1)),
+                            name="하위 25% 개체",
+                            text=bottom["개체번호"].apply(_fmt_id).tolist(),
+                            hovertemplate="%{text} 길이 %{y:.1f}mm<extra></extra>",
                         ))
                         fig.update_layout(
-                            title=f"뿌리 길이 비교 (상위 25% vs 하위 25%)",
-                            xaxis_title="그룹",
-                            yaxis_title=f"뿌리 길이({length_col}, mm)",
-                            height=450,
+                            title=f"뿌리 길이 비교 (개별 개체 점) [{length_col}]",
+                            xaxis_title="개체번호",
+                            yaxis_title="길이(mm)",
+                            height=400,
                         )
                         st.plotly_chart(fig, width="stretch")
                         st.write(f"- 뿌리 길이: 상위 {top[length_col].mean():,.1f}mm / 하위 {bottom[length_col].mean():,.1f}mm")
 
-                    # 뿌리 질량 비교 그래프 (막대=그룹 평균, 점=개별 개체, 라벨=평균)
+                    # 뿌리 질량
                     if "지하부 질량" in grp.columns:
                         fig = go.Figure()
-                        fig.add_trace(go.Bar(
-                            x=["상위 25% 그룹", "하위 25% 그룹"],
-                            y=[top["지하부 질량"].mean(), bottom["지하부 질량"].mean()],
-                            marker_color=["#3b82f6", "#ef4444"],
-                            text=[f"평균 {top['지하부 질량'].mean():,.2f}g", f"평균 {bottom['지하부 질량'].mean():,.2f}g"],
-                            textposition="outside",
-                            name="뿌리 질량 평균",
+                        fig.add_trace(go.Scatter(
+                            x=top["개체번호"].apply(_fmt_id), y=top["지하부 질량"],
+                            mode="markers",
+                            marker=dict(color="#3b82f6", size=12, line=dict(color="white", width=1)),
+                            name="상위 25% 개체",
+                            text=top["개체번호"].apply(_fmt_id).tolist(),
+                            hovertemplate="%{text} 질량 %{y:.2f}g<extra></extra>",
                         ))
                         fig.add_trace(go.Scatter(
-                            x=["상위 25% 그룹"] * len(top) + ["하위 25% 그룹"] * len(bottom),
-                            y=list(top["지하부 질량"]) + list(bottom["지하부 질량"]),
+                            x=bottom["개체번호"].apply(_fmt_id), y=bottom["지하부 질량"],
                             mode="markers",
-                            marker=dict(color=["#3b82f6"] * len(top) + ["#ef4444"] * len(bottom), size=8),
-                            showlegend=False,
-                            name="개별 개체",
+                            marker=dict(color="#ef4444", size=12, line=dict(color="white", width=1)),
+                            name="하위 25% 개체",
+                            text=bottom["개체번호"].apply(_fmt_id).tolist(),
+                            hovertemplate="%{text} 질량 %{y:.2f}g<extra></extra>",
                         ))
                         fig.update_layout(
-                            title="뿌리 질량 비교 (상위 25% vs 하위 25%)",
-                            xaxis_title="그룹",
+                            title="뿌리 질량 비교 (개별 개체 점)",
+                            xaxis_title="개체번호",
                             yaxis_title="뿌리 질량(g)",
-                            height=450,
+                            height=400,
                         )
                         st.plotly_chart(fig, width="stretch")
                         st.write(f"- 뿌리 질량: 상위 {top['지하부 질량'].mean():,.2f}g / 하위 {bottom['지하부 질량'].mean():,.2f}g")
+
+                    # 그룹별 점 개수 안내
+                    st.write(f"- 점 하나 = 개체 하나 (상위 25%: {len(top)}개체 / 하위 25%: {len(bottom)}개체)")
 
                     st.write("**핵심 내용**")
                     st.write("- 덜 자란 그룹은 잎 수와 뿌리 질량이 적었어요.")
