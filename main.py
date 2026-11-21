@@ -122,6 +122,7 @@ elif growth_file is not None:
 
 st.title("그린란드고추냉이의 생육 수준에 따른 뿌리 특성 비교")
 st.caption(f"학교: {school_name if school_name else '업로드된 학교 정보를 확인 중...'}")
+st.write("가설: 덜 자란 개체일수록 뿌리 질량 대비 길이가 클 것이다.")
 
 with st.spinner("CSV를 읽고 열 이름을 표준화하는 중..."):
     env_df = load_csv(env_file) if env_file is not None else None
