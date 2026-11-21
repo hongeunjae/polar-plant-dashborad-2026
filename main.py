@@ -200,24 +200,47 @@ with tab1:
                     st.metric("가장 무거운 개체 생중량", f"{max_v:g} g")
                     st.metric("가장 가벼운 개체 생중량", f"{min_v:g} g")
 
-                    # 개체별 생중량 막대그래프 (최대·최소 강조)
+                    # 개체별 생중량 막대그래프 (최대·최소 강조 + 값 표시)
                     tmp = growth_df[["개체번호", "생중량"]].dropna().sort_values("생중량", ascending=True).reset_index(drop=True)
                     tmp["개체 표시"] = tmp["개체번호"].apply(_fmt_id)
 
                     fig = go.Figure()
-                    fig.add_trace(go.Bar(x=tmp["개체 표시"], y=tmp["생중량"], marker_color="#94a3b8", name="개체별 생중량"))
-                    fig.add_trace(go.Bar(x=[tmp["개체 표시"].iloc[0]], y=[tmp["생중량"].iloc[0]], marker_color="#ef4444", name="가장 가벼운 개체"))
-                    fig.add_trace(go.Bar(x=[tmp["개체 표시"].iloc[-1]], y=[tmp["생중량"].iloc[-1]], marker_color="#f59e0b", name="가장 무거운 개체"))
-                    fig.update_layout(title="개체별 생중량", xaxis_title="", yaxis_title="생중량(g)", height=500)
+                    fig.add_trace(go.Bar(
+                        x=tmp["개체 표시"],
+                        y=tmp["생중량"],
+                        marker_color=["#f59e0b" if v == max_v else ("#ef4444" if v == min_v else "#94a3b8") for v in tmp["생중량"]],
+                        text=[f"{v:g} g" for v in tmp["생중량"]],
+                        textposition="outside",
+                        name="개체별 생중량",
+                    ))
+                    fig.update_layout(
+                        title="개체별 생중량",
+                        xaxis_title="",
+                        yaxis_title="생중량(g)",
+                        height=500,
+                        hovermode="x unified",
+                    )
                     st.plotly_chart(fig, width="stretch")
 
-                    # 가장 무거운 개체와 가장 가벼운 개체의 생중량 비교 막대그래프
-                    fig2 = go.Figure(data=[go.Bar(x=["가장 무거운 개체", "가장 가벼운 개체"], y=[max_v, min_v], marker_color=["#f59e0b", "#ef4444"])])
-                    fig2.update_layout(title="가장 무거운 개체와 가장 가벼운 개체의 생중량 비교", yaxis_title="생중량(g)", height=400)
+                    # 가장 무거운 개체와 가장 가벼운 개체의 생중량 비교
+                    fig2 = go.Figure(data=[
+                        go.Bar(
+                            x=["가장 무거운 개체", "가장 가벼운 개체"],
+                            y=[max_v, min_v],
+                            marker_color=["#f59e0b", "#ef4444"],
+                            text=[f"{max_v:g} g", f"{min_v:g} g"],
+                            textposition="outside",
+                        )
+                    ])
+                    fig2.update_layout(
+                        title="가장 무거운 개체와 가장 가벼운 개체의 생중량 비교",
+                        yaxis_title="생중량(g)",
+                        height=400,
+                    )
                     st.plotly_chart(fig2, width="stretch")
 
                     st.write("**탐구 목적과 가설**")
-                    st.write(f"- 탐구 대상: 그린란드고추완이 {len(biomass)}개체")
+                    st.write(f"- 탐구 대상: 그린란드고추냉이 {len(biomass)}개체")
                     st.write("- 같은 스마트팜에서 같은 기간 재배했지만 개체별 생중량 차이가 발생함")
                     st.write(f"- 가장 무거운 개체: {max_v:g}g / 가장 가벼운 개체: {min_v:g}g")
                     st.write("- 탐구 가설: 덜 자란 개체일수록 뿌리 질량 대비 길이가 클 것이다.")
@@ -257,7 +280,7 @@ with tab2:
                     top = grp[grp["생중량"] >= q75]
                     bottom = grp[grp["생중량"] <= q25]
 
-                    # 길이 열 결정 (지하부 길이가 있으면 사용, 없으면 지상부 길이)
+                    # 길이 열 결정 (지하부 길이가 있으면 사용)
                     length_col = None
                     for cand in ("지하부 길이", "지상부 길이"):
                         if cand in growth_df.columns:
@@ -279,24 +302,87 @@ with tab2:
                         summary_df = pd.DataFrame(summary_rows)
                         st.dataframe(summary_df, width="stretch")
 
-                    # 잎 수 비교
+                    # 잎 수 비교 그래프 (막대=그룹 평균, 점=개별 개체, 라벨=평균)
                     if "잎 수" in grp.columns:
-                        fig = go.Figure(data=[go.Bar(x=["상위 25% 그룹", "하위 25% 그룹"], y=[top["잎 수"].mean(), bottom["잎 수"].mean()], marker_color=["#3b82f6", "#ef4444"])])
-                        fig.update_layout(title="잎 수 비교 (상위 25% vs 하위 25%)", yaxis_title="잎 수(장)", height=400)
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            x=["상위 25% 그룹", "하위 25% 그룹"],
+                            y=[top["잎 수"].mean(), bottom["잎 수"].mean()],
+                            marker_color=["#3b82f6", "#ef4444"],
+                            text=[f"평균 {top['잎 수'].mean():,.1f}장", f"평균 {bottom['잎 수'].mean():,.1f}장"],
+                            textposition="outside",
+                            name="잎 수 평균",
+                        ))
+                        fig.add_trace(go.Scatter(
+                            x=["상위 25% 그룹"] * len(top) + ["하위 25% 그룹"] * len(bottom),
+                            y=list(top["잎 수"]) + list(bottom["잎 수"]),
+                            mode="markers",
+                            marker=dict(color=["#3b82f6"] * len(top) + ["#ef4444"] * len(bottom), size=8),
+                            showlegend=False,
+                            name="개별 개체",
+                        ))
+                        fig.update_layout(
+                            title="잎 수 비교 (상위 25% vs 하위 25%)",
+                            xaxis_title="그룹",
+                            yaxis_title="잎 수(장)",
+                            height=450,
+                        )
                         st.plotly_chart(fig, width="stretch")
                         st.write(f"- 잎 수: 상위 {top['잎 수'].mean():,.1f}장 / 하위 {bottom['잎 수'].mean():,.1f}장")
 
-                    # 뿌리 길이 비교
+                    # 뿌리 길이 비교 그래프 (막대=그룹 평균, 점=개별 개체, 라벨=평균)
                     if length_col is not None:
-                        fig = go.Figure(data=[go.Bar(x=["상위 25% 그룹", "하위 25% 그룹"], y=[top[length_col].mean(), bottom[length_col].mean()], marker_color=["#3b82f6", "#ef4444"])])
-                        fig.update_layout(title=f"뿌리 길이 비교 ({length_col})", yaxis_title="길이(mm)", height=400)
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            x=["상위 25% 그룹", "하위 25% 그룹"],
+                            y=[top[length_col].mean(), bottom[length_col].mean()],
+                            marker_color=["#3b82f6", "#ef4444"],
+                            text=[f"평균 {top[length_col].mean():,.1f}mm", f"평균 {bottom[length_col].mean():,.1f}mm"],
+                            textposition="outside",
+                            name="뿌리 길이 평균",
+                        ))
+                        fig.add_trace(go.Scatter(
+                            x=["상위 25% 그룹"] * len(top) + ["하위 25% 그룹"] * len(bottom),
+                            y=list(top[length_col]) + list(bottom[length_col]),
+                            mode="markers",
+                            marker=dict(color=["#3b82f6"] * len(top) + ["#ef4444"] * len(bottom), size=8),
+                            showlegend=False,
+                            name="개별 개체",
+                        ))
+                        fig.update_layout(
+                            title=f"뿌리 길이 비교 (상위 25% vs 하위 25%)",
+                            xaxis_title="그룹",
+                            yaxis_title=f"뿌리 길이({length_col}, mm)",
+                            height=450,
+                        )
                         st.plotly_chart(fig, width="stretch")
                         st.write(f"- 뿌리 길이: 상위 {top[length_col].mean():,.1f}mm / 하위 {bottom[length_col].mean():,.1f}mm")
 
-                    # 뿌리 질량 비교
+                    # 뿌리 질량 비교 그래프 (막대=그룹 평균, 점=개별 개체, 라벨=평균)
                     if "지하부 질량" in grp.columns:
-                        fig = go.Figure(data=[go.Bar(x=["상위 25% 그룹", "하위 25% 그룹"], y=[top["지하부 질량"].mean(), bottom["지하부 질량"].mean()], marker_color=["#3b82f6", "#ef4444"])])
-                        fig.update_layout(title="뿌리 질량 비교 (상위 25% vs 하위 25%)", yaxis_title="뿌리 질량(g)", height=400)
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            x=["상위 25% 그룹", "하위 25% 그룹"],
+                            y=[top["지하부 질량"].mean(), bottom["지하부 질량"].mean()],
+                            marker_color=["#3b82f6", "#ef4444"],
+                            text=[f"평균 {top['지하부 질량'].mean():,.2f}g", f"평균 {bottom['지하부 질량'].mean():,.2f}g"],
+                            textposition="outside",
+                            name="뿌리 질량 평균",
+                        ))
+                        fig.add_trace(go.Scatter(
+                            x=["상위 25% 그룹"] * len(top) + ["하위 25% 그룹"] * len(bottom),
+                            y=list(top["지하부 질량"]) + list(bottom["지하부 질량"]),
+                            mode="markers",
+                            marker=dict(color=["#3b82f6"] * len(top) + ["#ef4444"] * len(bottom), size=8),
+                            showlegend=False,
+                            name="개별 개체",
+                        ))
+                        fig.update_layout(
+                            title="뿌리 질량 비교 (상위 25% vs 하위 25%)",
+                            xaxis_title="그룹",
+                            yaxis_title="뿌리 질량(g)",
+                            height=450,
+                        )
                         st.plotly_chart(fig, width="stretch")
                         st.write(f"- 뿌리 질량: 상위 {top['지하부 질량'].mean():,.2f}g / 하위 {bottom['지하부 질량'].mean():,.2f}g")
 
