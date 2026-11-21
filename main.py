@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -115,6 +114,18 @@ def load_growth_df(data: bytes, file_name: str) -> pd.DataFrame:
 # 공용 함수
 # ============================================================
 
+def get_school_name(env_file, growth_file):
+    """학교명은 업로드한 파일명 앞부분(예: 인천아라고등학교_환경데이터.csv → 인천아라고등학교)에서 읽기(하드코딩 금지)"""
+    for f in (env_file, growth_file):
+        if f is None:
+            continue
+        base = os.path.splitext(f.name)[0]
+        name = base.split("_")[0].strip()
+        if name:
+            return name
+    return "우리 학교"
+
+
 def fmt_id(v):
     """개체번호를 56.0처럼 소수점 없이 원래 형태 그대로 표시"""
     if v is None:
@@ -201,7 +212,8 @@ def env_summary_table(df: pd.DataFrame):
 
 
 def main():
-    st.title("🌱 우리 학교 극지식물 개체별 생육 차이 분석")
+    school_name = get_school_name(env_file if "env_file" in dir() else None, None)
+    st.title(f"🌱 {school_name} 극지식물 개체별 생육 차이 분석")
 
     st.sidebar.title("📁 파일 업로드")
     env_file = st.sidebar.file_uploader(
@@ -231,12 +243,13 @@ def main():
         try:
             st.header("1. 연구 배경 및 목적")
             st.write(
-                "극지식물은 생육 환경이 까다로워 같은 종이라도 개체마다 생육 차이가 커요. "
-                "이 대시보드는 환경 조건과 개체별 생육 데이터를 연결해, 어느 개체가 잘 자랐는지와 "
-                "환경 요인의 관계를 한눈에 보기 위한 교육용 대시보드예요.")
+                f"{school_name} 극지 식물은 생육 환경이 까다로워 같은 종이라도 개체마다 "
+                "생육 차이가 커요. 이 대시보드는 환경 조건과 개체별 생육 데이터를 연결해, "
+                "어느 개체가 잘 자랐는지와 환경 요인의 관계를 한눈에 보기 위한 교육용 대시보드예요.")
             st.header("2. 데이터 요약")
             rows = []
             if not growth_df.empty:
+                rows.append(["학교명", school_name])
                 rows.append(["생육 개체 수", f"{len(growth_df)}개체"])
             if not env_df.empty:
                 if "time" in env_df.columns:
@@ -323,7 +336,9 @@ def main():
                         st.plotly_chart(fig, width="stretch")
             with st.expander("환경 데이터 원본 테이블"):
                 st.dataframe(env_df, width="stretch")
-                download_button(env_df, "환경 데이터 다운로드", "아라고_환경데이터.csv")
+                download_button(
+                    env_df, f"{school_name} 환경 데이터 다운로드",
+                    f"{school_name}_환경데이터.csv")
         except Exception as e:
             st.warning(f"⚠️ 이 부분은 데이터 형식 때문에 표시하지 못했어요: {e}")
 
@@ -394,11 +409,12 @@ def main():
                         st.write("상위 25% 개체: " + ", ".join(fmt_id(i) for i in high.index.tolist()))
                 with st.expander("생육 데이터 원본 테이블"):
                     st.dataframe(growth_df, width="stretch")
-                    download_button(growth_df, "생육 데이터 다운로드", "아라고_생육결과데이터.csv")
+                    download_button(
+                        growth_df, f"{school_name} 생육 데이터 다운로드",
+                        f"{school_name}_생육결과데이터.csv")
         except Exception as e:
             st.warning(f"⚠️ 이 부분은 데이터 형식 때문에 표시하지 못했어요: {e}")
 
 
 if __name__ == "__main__":
     main()
-                                                           
